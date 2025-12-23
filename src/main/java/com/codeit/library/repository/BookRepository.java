@@ -17,8 +17,6 @@ public interface BookRepository extends JpaRepository<Book, Long> {
 
     Optional<Book> findByIsbn(String isbn);
 
-    List<Book> findByAuthorOrderByPriceAsc(String author);
-
     List<Book> findByPublishedDateBetween(LocalDate startDate, LocalDate endDate);
 
     @Query("SELECT b FROM Book b WHERE b.price > :minPrice AND b.publishedDate > :date ORDER BY b.price DESC")

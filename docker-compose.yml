@@ -1,0 +1,81 @@
+# 커스텀 이미지가 필요할 때, 이미지가 존재한다면 빌드 언급할 필요 없음
+version: '3.8' # Docker Compose 파일 형식 버전, 지금 현재 많이 사용되는 안정적인 버전
+services: # 실행할 여러 컨테이너들을 정의
+  app: # 서비스 이름 (원하는 이름)
+    build: # 이미지를 직접 만들 때 사용
+      context: . # 현재 경로에서 빌드
+      dockerfile: Dockerfile # 어떤 도커파일을 쓸 지 명시
+    container_name: spring-app # 컨테이너 이름 명시
+    ports:
+      - "8080:8080" # 포트 매핑, 외부에서 8080 요청이 오면 컨테이너 안에 있는 8080으로 연결
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker # application docker 프로필 환경으로 적용
+      # docker compose에서는 컨테이너 이름 뿐만 아니라 service의 이름으로도 컨테이너를 지목 가능
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - JAVA_OPTS="-Xmx400m -Xms200m" # JVM 메모리 설정
+    depends_on: # 서비스 시작 순서 제어 (스프링 부트는 DB가 건강해야지만 시작)
+      postgres:
+        condition: service_healthy # postgres가 health check를 통과할 때까지 대기
+      redis:
+        condition: service_started # health check랑 상관없이 단순 컨테이너가 시작하기만 하면 됨
+    networks:
+      - app-network
+
+  postgres: # 이미 이미지를 가지고 있음 빌드 필요없음
+    image: postgres:16 # 이 이미지가 로컬에 존재하지 않는다면 허브에서 가져옴
+    container_name: my-postgres
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    environment: # 환경변수 설정 값
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: ${POSTGRES_DB} # compose 파일을 외부에 노출해야 한다면 하드코딩은 값이 노출 될 수 있으니 env파일 가쟈오기
+    volumes: # 여러 개 볼륨을 지정할 수 있음
+      - my-postgres-data:/var/lib/postgresql/data
+    command: >
+      postgres 
+      -c shared_buffers=128MB #보통 권장량은 전체 램의 25% 정도 남겨놓는 걸 권장
+      -c max_connections=50 #데이터베이스의 최대로 한 번에 접속할 수 있는 사용자의 양
+    healthcheck: # 컨테이너가 정상인지 주기적으로 확인
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB}"] # 컨테이너가 생성되면 이 명령어를 대신 작성해줌(헬스 체크 위한 명령어)
+      interval: 10s # 10초 마다 체크
+      timeout: 5s # 5초안에 응답 없으면 health 하지 않다 판단
+      retries: 5 # 재시도 횟수 5번, 5번 실패하면 unhealth
+    networks:
+      - app-network
+
+  redis: # 인메모리 데이터베이스는 H2랑 다르고 nosql 기반은 구조가 딱히 없고, 테이블 개념이 없음
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 100mb --maxmemory-policy allkeys-lru
+    # lru 만약에 꽉차면 새로운 데이터가 들어오면 가장 오랫동안 줘야되지 않을것부터 뺌
+    # 기존의 레디스는 단순히 메모리 데이터 저장하고 끝내지만, 활성화 해주면 데이터의 영속화 설정 진행
+    # 컨테이너를 시작할 때 내가 어떤 특정 컨테이너에게 명령을 지정하고 싶을 때
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+
+# 볼륨 정의
+volumes:
+  my-postgres-data:
+    # 컨테이너 데이터를 저장하는 이 볼륨을 생성할 때 기본적으로 사용하는 드라이버를 어디다 저장할거냐, 도커의 호스트의 로컬 시스템에다가 저장
+    driver: local # 볼륨 데이터를 호스트의 로컬에 저장하겠다.
+  redis-data:
+    driver: local
+
+
+# 네트워크 설정
+# 컨테이너 간의 상호작용을 위한 네트워크 정의
+networks:
+  app-network: # 이름 지정
+    driver: bridge # 어떤 형식인지 bridge

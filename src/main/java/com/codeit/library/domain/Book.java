@@ -2,6 +2,7 @@ package com.codeit.library.domain;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -35,6 +36,18 @@ public class Book {
         validateAuthor(author);
         validatePrice(price);
         
+        this.title = title;
+        this.author = author;
+        this.isbn = isbn;
+        this.price = price;
+    }
+
+    public Book(Long id, String title, String author, String isbn, Integer price) {
+        validateTitle(title);
+        validateAuthor(author);
+        validatePrice(price);
+
+        this.id = id;
         this.title = title;
         this.author = author;
         this.isbn = isbn;
