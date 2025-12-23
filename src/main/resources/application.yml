@@ -1,16 +1,18 @@
 spring:
   application:
     name: library-management
-  
+
+  # 기본 프로필 (로컬 개발용)
   datasource:
-    url: jdbc:h2:mem:librarydb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    # url: jdbc:postgresql://host.docker.internal:5433/postgres
+    url: jdbc:postgresql://myapp-postgres-db.cjeiqaeeoxg0.ap-northeast-2.rds.amazonaws.com:5432/postgres
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: ${DB_PASSWORD}
   
   h2:
     console:
-      enabled: true
+      enabled: off
       path: /h2-console
   
   jpa:
@@ -26,7 +28,37 @@ spring:
   sql:
     init:
       mode: always
+  cloud:
+    aws:
+      credentials:
+        access-key: ${AWS_S3_ACCESS_KEY}
+        secret-key: ${AWS_S3_SECRET_KEY}
+      region:
+        static: ap-northeast-2
+      s3:
+        bucket: s3-practice-bucket-jw
 
 server:
   port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+
+--- # 위에 있는 프로필과 구분하기 위해 --- 필수!
+# Docker 환경용 프로필 (스프링 초기화 시 프로필 active가 docker라면 아래 설정을 우선시)
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  # 환경변수로 외부에서 주입 받음
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+
+
 
