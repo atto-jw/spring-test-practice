@@ -12,6 +12,8 @@ env:
   ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
   ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
   ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+  CONTAINER_NAME: spring-app
+
 
 # workflow에서 실행될 작업을 정의
 jobs:
@@ -87,6 +89,21 @@ jobs:
           aws ecs describe-task-definition \
             --task-definition my-spring-app \
             --query taskDefinition > task-definition.json
+          
+          sudo apt-get update && sudo apt-get install -y jq
+          
+          jq 'del(
+            .taskDefinitionArn,
+            .revision,
+            .status,
+            .requiresAttributes,
+            .compatibilities,
+            .registeredAt,
+            .registeredBy,
+            .enableFaultInjection
+          )' task-definition.json > task-definition-clean.json
+          
+          mv task-definition-clean.json task-definition.json
           
       # 9. Task Definition에 새 이미지 반영
       - name: Fill in the new image ID in task definition
